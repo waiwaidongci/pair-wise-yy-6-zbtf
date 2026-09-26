@@ -1,0 +1,209 @@
+{
+  "records": [
+    {
+      "id": "PR-20260611-001",
+      "code": "IS-001",
+      "moldNo": "M-12",
+      "targetGrams": 60,
+      "feedGrams": 60.5,
+      "pressureMPa": 22,
+      "holdSeconds": 45,
+      "operator": "王墨生",
+      "status": "已放行",
+      "registeredAt": "2026-06-11T02:10:00.000Z",
+      "readings": {
+        "first": {
+          "inspector": "陈平",
+          "thicknessMm": 18.2,
+          "edgeIntact": true,
+          "at": "2026-06-11T02:30:00.000Z"
+        },
+        "second": {
+          "inspector": "陈平",
+          "thicknessMm": 18.25,
+          "edgeIntact": true,
+          "at": "2026-06-11T02:55:00.000Z"
+        },
+        "diffMm": 0.05
+      },
+      "releasedAt": "2026-06-11T02:55:00.000Z",
+      "events": [
+        {
+          "at": "2026-06-11T02:10:00.000Z",
+          "type": "register",
+          "note": "登记压模，合格转待复验",
+          "operator": "王墨生"
+        },
+        {
+          "at": "2026-06-11T02:30:00.000Z",
+          "type": "first_reading",
+          "note": "首量厚度 18.20mm，检查员陈平，二十分钟后复量",
+          "inspector": "陈平"
+        },
+        {
+          "at": "2026-06-11T02:55:00.000Z",
+          "type": "release",
+          "note": "厚度差 0.05mm，边角完整，放行进入试磨",
+          "inspector": "陈平"
+        }
+      ]
+    },
+    {
+      "id": "PR-20260621-001",
+      "code": "IS-002",
+      "moldNo": "M-07",
+      "targetGrams": 58,
+      "feedGrams": 59,
+      "pressureMPa": 20,
+      "holdSeconds": 40,
+      "operator": "王墨生",
+      "status": "已放行",
+      "registeredAt": "2026-06-21T03:20:00.000Z",
+      "readings": {
+        "first": {
+          "inspector": "林雪",
+          "thicknessMm": 17.8,
+          "edgeIntact": true,
+          "at": "2026-06-21T03:40:00.000Z"
+        },
+        "second": {
+          "inspector": "林雪",
+          "thicknessMm": 17.9,
+          "edgeIntact": true,
+          "at": "2026-06-21T04:02:00.000Z"
+        },
+        "diffMm": 0.1
+      },
+      "releasedAt": "2026-06-21T04:02:00.000Z",
+      "events": [
+        {
+          "at": "2026-06-21T03:20:00.000Z",
+          "type": "register",
+          "note": "登记压模，合格转待复验",
+          "operator": "王墨生"
+        },
+        {
+          "at": "2026-06-21T03:40:00.000Z",
+          "type": "first_reading",
+          "note": "首量厚度 17.80mm，检查员林雪，二十分钟后复量",
+          "inspector": "林雪"
+        },
+        {
+          "at": "2026-06-21T04:02:00.000Z",
+          "type": "release",
+          "note": "厚度差 0.1mm，边角完整，放行进入试磨",
+          "inspector": "林雪"
+        }
+      ]
+    },
+    {
+      "id": "PR-20260925-002",
+      "code": "IS-002",
+      "moldNo": "M-08",
+      "targetGrams": 58,
+      "feedGrams": 59,
+      "pressureMPa": 20,
+      "holdSeconds": 40,
+      "operator": "周砚",
+      "status": "已失效",
+      "registeredAt": "2026-09-20T06:00:00.000Z",
+      "releasedAt": "2026-09-20T06:40:00.000Z",
+      "readings": {
+        "first": {
+          "inspector": "陈平",
+          "thicknessMm": 17.8,
+          "edgeIntact": true,
+          "at": "2026-09-20T06:15:00.000Z"
+        },
+        "second": {
+          "inspector": "陈平",
+          "thicknessMm": 17.9,
+          "edgeIntact": true,
+          "at": "2026-09-20T06:40:00.000Z"
+        },
+        "diffMm": 0.1
+      },
+      "supersededBy": "PR-20260925-003",
+      "events": [
+        {
+          "at": "2026-09-20T06:00:00.000Z",
+          "type": "register",
+          "note": "登记压模，合格转待复验",
+          "operator": "周砚"
+        },
+        {
+          "at": "2026-09-20T06:40:00.000Z",
+          "type": "release",
+          "note": "厚度差 0.1mm，边角完整，放行",
+          "inspector": "陈平"
+        },
+        {
+          "at": "2026-09-25T02:00:00.000Z",
+          "type": "supersede",
+          "note": "改用模具 M-07，旧放行失效，旧单留档可查",
+          "by": "周砚"
+        }
+      ]
+    },
+    {
+      "id": "PR-20260925-004",
+      "code": "IS-005",
+      "moldNo": "M-15",
+      "targetGrams": 62,
+      "feedGrams": 58,
+      "pressureMPa": 21,
+      "holdSeconds": 50,
+      "operator": "李压",
+      "status": "待补料",
+      "registeredAt": "2026-09-25T07:10:00.000Z",
+      "rejectReasons": [
+        {
+          "code": "FEED_DEVIATION",
+          "message": "加料58g 偏离目标62g 达 4g，超过 3g"
+        }
+      ],
+      "events": [
+        {
+          "at": "2026-09-25T07:10:00.000Z",
+          "type": "register",
+          "note": "登记压模：加料58g 偏离目标62g 达 4g，超过 3g，转待补料",
+          "operator": "李压"
+        }
+      ]
+    },
+    {
+      "id": "PR-20260925-005",
+      "code": "IS-006",
+      "moldNo": "M-03",
+      "targetGrams": 60,
+      "feedGrams": 60.5,
+      "pressureMPa": 19,
+      "holdSeconds": 45,
+      "operator": "王墨生",
+      "status": "待复验",
+      "registeredAt": "2026-09-25T08:00:00.000Z",
+      "readings": {
+        "first": {
+          "inspector": "陈平",
+          "thicknessMm": 18.1,
+          "edgeIntact": true,
+          "at": "2026-09-25T08:20:00.000Z"
+        }
+      },
+      "events": [
+        {
+          "at": "2026-09-25T08:00:00.000Z",
+          "type": "register",
+          "note": "登记压模，合格转待复验",
+          "operator": "王墨生"
+        },
+        {
+          "at": "2026-09-25T08:20:00.000Z",
+          "type": "first_reading",
+          "note": "首量厚度 18.10mm，检查员陈平，二十分钟后复量",
+          "inspector": "陈平"
+        }
+      ]
+    }
+  ]
+}

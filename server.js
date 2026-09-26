@@ -3,6 +3,8 @@ import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { serve as servePress } from "./press/handlers.js";
+import { loadArchive, latestReleasedByCode } from "./press/archive.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const dbPath = join(__dirname, "data", "ink-stick-testing.json");
@@ -98,7 +100,7 @@ function page() {
   </style>
 </head>
 <body>
-  <header><div><h1>墨锭试磨室</h1><div class="meta">墨锭建档、试磨记录和评分统计</div></div><button id="reload">刷新</button></header>
+  <header><div><h1>墨锭试磨室</h1><div class="meta">墨锭建档、试磨记录和评分统计（未经压模放行台放行的墨锭不能进入试磨）</div></div><div style="display:flex;gap:14px;align-items:center"><a href="/press" style="color:var(--accent);font-weight:700;text-decoration:none">压模放行台 →</a><button id="reload">刷新</button></div></header>
   <main>
     <section>
       <form id="createForm"><h2>新增墨锭</h2><div id="fields"></div><label>初始状态</label><select name="status">${stages.map(s => '<option>'+s+'</option>').join('')}</select><button>保存墨锭</button></form>
@@ -160,6 +162,7 @@ function page() {
 const server = http.createServer(async (req, res) => {
   try {
     const url = new URL(req.url, `http://${req.headers.host}`);
+    if (await servePress(req, res, url)) return;
     const db = await loadDb();
     if (req.method === "GET" && url.pathname === "/") return html(res, page());
     if (req.method === "GET" && url.pathname === "/api/items") return send(res, 200, db.items.map(summarize));
@@ -195,6 +198,11 @@ const server = http.createServer(async (req, res) => {
     if (action && req.method === "POST") {
       const item = db.items.find(x => x.id === action[1] || x.code === action[1]);
       if (!item) return send(res, 404, { error: "item_not_found" });
+      await loadArchive();
+      const pass = latestReleasedByCode(item.code);
+      if (!pass) {
+        return send(res, 409, { error: "not_released_for_grinding", message: `墨锭 ${item.code} 没有有效的压模放行单，请先在压模放行台完成复验放行` });
+      }
       const input = await body(req);
       item.logs ||= [];
       const score = Number(input.score || 0);
