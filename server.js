@@ -3,6 +3,8 @@ import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { createPressHandler } from "./press-handler.js";
+import { loadArchive as loadPressArchive, findOpenByInk as findOpenPress } from "./press-archive.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const dbPath = join(__dirname, "data", "ink-stick-testing.json");
@@ -74,6 +76,15 @@ function summarize(item) {
   const logCount = (item.logs || []).length + (item.tasks || []).reduce((n, t) => n + (t.logs || []).length, 0);
   return { ...item, logCount };
 }
+// 压模放行台：请求处理在 press-handler.js，判定规则在 press-rules.js，档案存储在 press-archive.js
+const handlePress = createPressHandler({
+  readBody: body,
+  send,
+  findInkStick: async code => {
+    const db = await loadDb();
+    return db.items.find(x => x.code === code || x.id === code) || null;
+  },
+});
 function page() {
   return `<!doctype html>
 <html lang="zh-CN">
@@ -94,11 +105,12 @@ function page() {
     .grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(280px,1fr)); gap:12px; } .card { display:grid; gap:8px; }
     .meta { color:var(--muted); font-size:13px; } .pill { display:inline-block; border:1px solid var(--line); border-radius:999px; padding:3px 8px; font-size:12px; }
     .logs { border-top:1px solid var(--line); padding-top:8px; max-height:90px; overflow:auto; } .warn { color:var(--warn); font-weight:700; }
-    @media (max-width:900px){ header{display:block;padding:18px 16px;} main{grid-template-columns:1fr;padding:16px;} }
+    .press-layout { display:grid; grid-template-columns:340px 1fr; gap:18px; align-items:start; } h4 { margin:10px 0 4px; font-size:15px; }
+    @media (max-width:900px){ header{display:block;padding:18px 16px;} main{grid-template-columns:1fr;padding:16px;} .press-layout{grid-template-columns:1fr;} }
   </style>
 </head>
 <body>
-  <header><div><h1>墨锭试磨室</h1><div class="meta">墨锭建档、试磨记录和评分统计</div></div><button id="reload">刷新</button></header>
+  <header><div><h1>墨锭试磨室</h1><div class="meta">墨锭建档、压模放行、试磨记录和评分统计</div></div><button id="reload">刷新</button></header>
   <main>
     <section>
       <form id="createForm"><h2>新增墨锭</h2><div id="fields"></div><label>初始状态</label><select name="status">${stages.map(s => '<option>'+s+'</option>').join('')}</select><button>保存墨锭</button></form>
@@ -108,6 +120,28 @@ function page() {
       <div class="stats" id="stats"></div>
       <div class="toolbar"><select id="statusFilter"><option value="">全部状态</option>${stages.map(s => '<option>'+s+'</option>').join('')}</select><input id="search" placeholder="搜索编号或关键词"></div>
       <div class="panel"><h2>选择墨锭后录入试磨记录，系统会保留多次试磨结果并更新评分状态。</h2><div class="grid" id="cards"></div></div>
+    </section>
+    <section class="panel" style="grid-column:1/-1">
+      <h2>压模放行台</h2>
+      <div class="meta" style="margin-bottom:12px">登记模具号、加料克重、压力、保压时长和操作人；缺项、克重偏离目标超过3克或压力低于18兆帕转待补料，不进入试磨。补料后由另一位检查员隔20分钟量两次厚度，差值不超过0.2毫米且边角完整才放行；改模具、压力或加料量会让旧放行失效，旧单保留可查。</div>
+      <div class="press-layout">
+        <form id="pressForm">
+          <h2>压模登记</h2>
+          <label>墨锭</label><select name="inkCode" id="pressInk"></select>
+          <label>模具号</label><input name="moldNo" required>
+          <label>目标克重</label><input name="targetWeight" type="number" step="0.1" required>
+          <label>加料克重</label><input name="weight" type="number" step="0.1" required>
+          <label>压力（兆帕）</label><input name="pressure" type="number" step="0.1" required>
+          <label>保压时长（分钟）</label><input name="holdMinutes" type="number" required>
+          <label>操作人</label><input name="operator" required>
+          <button>登记压模</button>
+        </form>
+        <div>
+          <div class="stats" id="pressStats"></div>
+          <div class="toolbar"><select id="pressFilter"><option value="">全部状态</option><option>待补料</option><option>待复验</option><option>已放行</option><option>已失效</option></select></div>
+          <div class="grid" id="pressCards"></div>
+        </div>
+      </div>
     </section>
   </main>
   <script>
@@ -147,9 +181,75 @@ function page() {
       const logs = (item.logs || []).slice(-4).map(l => '<div>'+l.step+'：'+l.note+'</div>').join('');
       return '<article class="card"><h3>'+(item.code || item.id)+'</h3><span class="pill">'+item.status+'</span>'+main+tasks+'<label>状态</label><select data-status="'+(item.id || item.code)+'">'+stages.map(s => '<option '+(s===item.status?'selected':'')+'>'+s+'</option>').join('')+'</select><button class="secondary" data-note="'+(item.id || item.code)+'">追加备注</button><div class="logs meta">'+(logs || '暂无记录')+'</div></article>';
     }
-    async function load() { items = await api('/api/items'); render(); }
-    createForm.onsubmit = async event => { event.preventDefault(); await api('/api/items', { method:'POST', body: JSON.stringify(Object.fromEntries(new FormData(createForm).entries())) }); createForm.reset(); await load(); };
-    actionForm.onsubmit = async event => { event.preventDefault(); await api('/api/items/'+itemSelect.value+'/action', { method:'POST', body: JSON.stringify(Object.fromEntries(new FormData(actionForm).entries())) }); actionForm.reset(); await load(); };
+    async function load() { items = await api('/api/items'); render(); await loadPress(); }
+    const pressStages = ["待补料","待复验","已放行","已失效"];
+    const pressForm = document.querySelector('#pressForm');
+    const pressCards = document.querySelector('#pressCards');
+    const pressStatsEl = document.querySelector('#pressStats');
+    const pressFilter = document.querySelector('#pressFilter');
+    const pressInk = document.querySelector('#pressInk');
+    let pressRecords = [];
+    function fmtLocal(d) { const p = n => String(n).padStart(2, '0'); return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate()) + 'T' + p(d.getHours()) + ':' + p(d.getMinutes()); }
+    async function loadPress() { pressRecords = await api('/api/press'); renderPress(); }
+    function renderPress() {
+      pressInk.innerHTML = items.map(item => '<option value="' + (item.code || item.id) + '">' + (item.code || item.id) + '</option>').join('');
+      const stats = Object.fromEntries(pressStages.map(s => [s, pressRecords.filter(r => r.status === s).length]));
+      pressStatsEl.innerHTML = Object.entries(stats).map(([k, v]) => '<div class="stat"><span>' + k + '</span><strong>' + v + '</strong></div>').join('');
+      const st = pressFilter.value;
+      const visible = pressRecords.filter(r => !st || r.status === st);
+      pressCards.innerHTML = visible.map(pressCardHtml).join('') || '<div class="meta">暂无压模记录</div>';
+      document.querySelectorAll('[data-refill]').forEach(f => f.onsubmit = async event => {
+        event.preventDefault();
+        try { await api('/api/press/' + f.dataset.refill + '/refill', { method: 'POST', body: JSON.stringify(Object.fromEntries(new FormData(f).entries())) }); await loadPress(); } catch (err) { alert(err.message); }
+      });
+      document.querySelectorAll('[data-inspect]').forEach(f => f.onsubmit = async event => {
+        event.preventDefault();
+        const data = Object.fromEntries(new FormData(f).entries());
+        data.edgesComplete = f.edgesComplete.checked;
+        try { await api('/api/press/' + f.dataset.inspect + '/inspection', { method: 'POST', body: JSON.stringify(data) }); await loadPress(); } catch (err) { alert(err.message); }
+      });
+    }
+    function pressCardHtml(r) {
+      const params = '<div><b>模具</b> ' + (r.moldNo || '') + ' · <b>克重</b> ' + (r.weight ?? '?') + '/' + (r.targetWeight ?? '?') + '克 · <b>压力</b> ' + (r.pressure ?? '?') + '兆帕 · <b>保压</b> ' + (r.holdMinutes ?? '?') + '分 · <b>操作人</b> ' + (r.operator || '') + '</div>';
+      const issues = (r.issues || []).map(i => '<div class="warn">' + i + '</div>').join('');
+      const history = (r.refills || []).map(f => '<div>补料：' + (f.weight ?? '?') + '克 · ' + (f.pressure ?? '?') + '兆帕' + (f.note ? ' · ' + f.note : '') + '</div>').join('') + (r.inspections || []).map(i => '<div>复验' + (i.pass ? '通过' : '未过') + '：' + (i.thickness1 ?? '?') + '/' + (i.thickness2 ?? '?') + '毫米 · ' + i.inspector + '</div>').join('');
+      let action = '';
+      if (r.status === '待补料') action = refillFormHtml(r);
+      if (r.status === '待复验') action = inspectFormHtml(r);
+      const released = r.status === '已放行' ? '<div class="meta">放行人 ' + r.releasedBy + ' · ' + new Date(r.releasedAt).toLocaleString() + '</div>' : '';
+      const invalid = r.status === '已失效' ? '<div class="warn">' + (r.invalidReason || '') + '</div>' : '';
+      return '<article class="card"><h3>' + r.inkCode + ' · ' + r.id + '</h3><span class="pill">' + r.status + '</span>' + params + issues + invalid + '<div class="logs meta">' + (history || '暂无补料/复验记录') + '</div>' + released + action + '</article>';
+    }
+    function refillFormHtml(r) {
+      return '<form data-refill="' + r.id + '"><h4>补料登记</h4>'
+        + '<label>加料克重</label><input name="weight" type="number" step="0.1" value="' + (r.weight ?? '') + '">'
+        + '<label>目标克重</label><input name="targetWeight" type="number" step="0.1" value="' + (r.targetWeight ?? '') + '">'
+        + '<label>压力（兆帕）</label><input name="pressure" type="number" step="0.1" value="' + (r.pressure ?? '') + '">'
+        + '<label>保压时长（分钟）</label><input name="holdMinutes" type="number" value="' + (r.holdMinutes ?? '') + '">'
+        + '<label>模具号</label><input name="moldNo" value="' + (r.moldNo || '') + '">'
+        + '<label>操作人</label><input name="operator" value="' + (r.operator || '') + '">'
+        + '<label>补料备注</label><input name="note">'
+        + '<button>提交补料</button></form>';
+    }
+    function inspectFormHtml(r) {
+      const now = fmtLocal(new Date());
+      const earlier = fmtLocal(new Date(Date.now() - 20 * 60000));
+      return '<form data-inspect="' + r.id + '"><h4>厚度复验（须另一位检查员，两次间隔不少于20分钟）</h4>'
+        + '<label>检查员</label><input name="inspector" required>'
+        + '<label>第一次厚度（毫米）</label><input name="thickness1" type="number" step="0.01" required>'
+        + '<label>第一次量测时间</label><input name="measuredAt1" type="datetime-local" value="' + earlier + '">'
+        + '<label>第二次厚度（毫米）</label><input name="thickness2" type="number" step="0.01" required>'
+        + '<label>第二次量测时间</label><input name="measuredAt2" type="datetime-local" value="' + now + '">'
+        + '<label style="display:flex;gap:6px;align-items:center"><input name="edgesComplete" type="checkbox" style="width:auto">边角完整</label>'
+        + '<button>提交复验</button></form>';
+    }
+    pressForm.onsubmit = async event => {
+      event.preventDefault();
+      try { await api('/api/press', { method: 'POST', body: JSON.stringify(Object.fromEntries(new FormData(pressForm).entries())) }); pressForm.reset(); await loadPress(); } catch (err) { alert(err.message); }
+    };
+    pressFilter.onchange = renderPress;
+    createForm.onsubmit = async event => { event.preventDefault(); try { await api('/api/items', { method:'POST', body: JSON.stringify(Object.fromEntries(new FormData(createForm).entries())) }); createForm.reset(); await load(); } catch (err) { alert(err.message); } };
+    actionForm.onsubmit = async event => { event.preventDefault(); try { await api('/api/items/'+itemSelect.value+'/action', { method:'POST', body: JSON.stringify(Object.fromEntries(new FormData(actionForm).entries())) }); actionForm.reset(); await load(); } catch (err) { alert(err.message); } };
     document.querySelector('#statusFilter').onchange = render; document.querySelector('#search').oninput = render; document.querySelector('#reload').onclick = load;
     renderForms(); load();
   </script>
@@ -162,6 +262,7 @@ const server = http.createServer(async (req, res) => {
     const url = new URL(req.url, `http://${req.headers.host}`);
     const db = await loadDb();
     if (req.method === "GET" && url.pathname === "/") return html(res, page());
+    if (url.pathname.startsWith("/api/press")) return handlePress(req, res, url);
     if (req.method === "GET" && url.pathname === "/api/items") return send(res, 200, db.items.map(summarize));
     if (req.method === "POST" && url.pathname === "/api/items") {
       const input = await body(req);
@@ -195,6 +296,9 @@ const server = http.createServer(async (req, res) => {
     if (action && req.method === "POST") {
       const item = db.items.find(x => x.id === action[1] || x.code === action[1]);
       if (!item) return send(res, 404, { error: "item_not_found" });
+      const pressDb = await loadPressArchive();
+      const openPress = findOpenPress(pressDb, item.code) || findOpenPress(pressDb, item.id);
+      if (openPress) return send(res, 409, { error: "压模" + openPress.status + "（" + openPress.id + "），不能试磨" });
       const input = await body(req);
       item.logs ||= [];
       const score = Number(input.score || 0);
